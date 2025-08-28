@@ -35,7 +35,6 @@ COMMANDS:
 `
 
 func main() {
-	// --- Load Config ---
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
 		log.Fatalf("Failed to get user config directory: %v", err)

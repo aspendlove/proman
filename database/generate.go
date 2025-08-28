@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,14 +14,16 @@ func GenTypes(cfg *config.Config, args []string) error {
 	}
 	projectID := args[0]
 
-	// Get the connection details from the config
 	params, found := cfg.GetConnection(projectID)
 	if !found {
 		return fmt.Errorf("project with ID '%s' not found", projectID)
 	}
 
 	if params.SupabaseProjectID == "" {
-		return fmt.Errorf("supabase project ID is not set for project '%s'. Please add it via the register command or by editing the config file", projectID)
+		return fmt.Errorf(
+			"supabase project ID is not set for project '%s'. Please add it via the register command or by editing the config file",
+			projectID,
+		)
 	}
 
 	supabasePath := cfg.Binaries.Supabase
@@ -30,20 +33,20 @@ func GenTypes(cfg *config.Config, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "Generating TypeScript types for project: %s (%s)\n", projectID, params.SupabaseProjectID)
 
-	// Construct the command
-	cmd := exec.Command(supabasePath, "gen", "types", "--lang", "typescript", "--project-id", params.SupabaseProjectID, "--schema", "public")
+	cmd := exec.Command(
+		supabasePath, "gen", "types", "--lang", "typescript", "--project-id", params.SupabaseProjectID, "--schema",
+		"public",
+	)
 
-	// Capture the output
 	output, err := cmd.Output()
 	if err != nil {
-		// If the command fails, stderr will be in the err object
-		if ee, ok := err.(*exec.ExitError); ok {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
 			return fmt.Errorf("failed to run supabase gen types: %s", string(ee.Stderr))
 		}
 		return fmt.Errorf("failed to run supabase gen types: %w", err)
 	}
 
-	// Print the output to stdout
 	fmt.Println(string(output))
 
 	return nil

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
+	_ "github.com/lib/pq"
 	pgschemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 )
 
