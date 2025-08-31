@@ -8,6 +8,8 @@ import (
 	"proman/config"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/ugurcsen/gods-generic/sets/hashset"
 )
 
 func prompt(reader *bufio.Reader, text string) (string, error) {
@@ -182,12 +184,19 @@ func Init(cfg *config.Config, configFile string) error {
 		return err
 	}
 
-	resultsPath, err := prompt(reader, fmt.Sprintf("Path to results (current: %s): ", cfg.Binaries.Results))
+	supabasePath, err := prompt(reader, fmt.Sprintf("Path to supabase (current: %s): ", cfg.Binaries.Supabase))
 	if err != nil {
 		return err
 	}
 
-	supabasePath, err := prompt(reader, fmt.Sprintf("Path to supabase (current: %s): ", cfg.Binaries.Supabase))
+	acceptedEditors := hashset.New[string](
+		"zed",
+		"git",
+		"vscode",
+		"meld",
+	)
+
+	editor, err := prompt(reader, "Prefered Diff Viewer (zed, git, vscode, or meld): ")
 	if err != nil {
 		return err
 	}
@@ -201,8 +210,8 @@ func Init(cfg *config.Config, configFile string) error {
 	if pgDumpAllPath != "" {
 		cfg.Binaries.PGDumpAll = pgDumpAllPath
 	}
-	if resultsPath != "" {
-		cfg.Binaries.Results = resultsPath
+	if editor != "" && acceptedEditors.Contains(editor) {
+		cfg.Editor.Default = editor
 	}
 	if supabasePath != "" {
 		cfg.Binaries.Supabase = supabasePath

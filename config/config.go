@@ -19,12 +19,16 @@ type BinaryPaths struct {
 	PGDumpAll string `json:"pg_dumpall"`
 	PGDump    string `json:"pg_dump"`
 	Supabase  string `json:"supabase"`
-	Results   string `json:"results"`
+}
+
+type Editor struct {
+	Default string `json:"default"`
 }
 
 type Config struct {
 	Connections map[string]ConnectionParams `json:"connections"`
 	Binaries    BinaryPaths                 `json:"binaries"`
+	Editor      Editor                      `json:"editor"`
 }
 
 func Load(filePath string) (*Config, error) {

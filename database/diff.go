@@ -25,9 +25,6 @@ func Diff(cfg *config.Config, args []string) error {
 	}
 
 	binaries := cfg.GetBinaryPaths()
-	if binaries.Results == "" {
-		return fmt.Errorf("the 'results' binary path is not set in the config")
-	}
 
 	// 2. Generate Diff
 	fmt.Fprintf(os.Stderr, "--- Generating Schema Diff for %s -> %s ---", sourceID, targetID)

@@ -22,6 +22,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/ugurcsen/gods-generic v0.10.4 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
