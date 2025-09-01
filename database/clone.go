@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"proman/config"
 	"strings"
 	"time"
@@ -15,28 +16,27 @@ import (
 	pgschemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 )
 
-// generateDiff uses the 'stripe/pg-schema-diff' library to compare two databases and generate a migration script.
-func generateDiff(sourceParams, targetParams config.ConnectionParams, binaries config.BinaryPaths) (string, error) {
-	// Construct DSNs (Data Source Names) for database/sql
-	sourceDSN := fmt.Sprintf(
+func formatRemoteConnectionString(connection config.ConnectionParams) string {
+	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		sourceParams.User, sourceParams.Password, sourceParams.Host, sourceParams.Port, sourceParams.DBName,
+		connection.User, connection.Password, connection.Host, connection.Port, connection.DBName,
 	)
-	targetDSN := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		targetParams.User, targetParams.Password, targetParams.Host, targetParams.Port, targetParams.DBName,
-	)
+}
+
+func generateDiffStripe(sourceParams, targetParams config.ConnectionParams, binaries config.BinaryPaths) (string, error) {
+	sourceDSN := formatRemoteConnectionString(sourceParams)
+	targetDSN := formatRemoteConnectionString(sourceParams)
 
 	// Open database connections
 	sourceDB, err := sql.Open("postgres", sourceDSN)
 	if err != nil {
-		return "", fmt.Errorf("failed to open source database connection: %%w", err)
+		return "", fmt.Errorf("failed to open source database connection: %w", err)
 	}
 	defer sourceDB.Close()
 
 	targetDB, err := sql.Open("postgres", targetDSN)
 	if err != nil {
-		return "", fmt.Errorf("failed to open target database connection: %%w", err)
+		return "", fmt.Errorf("failed to open target database connection: %w", err)
 	}
 	defer targetDB.Close()
 
@@ -48,10 +48,10 @@ func generateDiff(sourceParams, targetParams config.ConnectionParams, binaries c
 
 	// Ping databases to ensure connections are established
 	if err := sourceDB.Ping(); err != nil {
-		return "", fmt.Errorf("failed to connect to source database: %%w", err)
+		return "", fmt.Errorf("failed to connect to source database: %w", err)
 	}
 	if err := targetDB.Ping(); err != nil {
-		return "", fmt.Errorf("failed to connect to target database: %%w", err)
+		return "", fmt.Errorf("failed to connect to target database: %w", err)
 	}
 
 	// Generate the diff
@@ -59,7 +59,7 @@ func generateDiff(sourceParams, targetParams config.ConnectionParams, binaries c
 		context.Background(), pgschemadiff.DBSchemaSource(sourceDB), pgschemadiff.DBSchemaSource(targetDB),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate schema diff: %%w", err)
+		return "", fmt.Errorf("failed to generate schema diff: %w", err)
 	}
 
 	// Format the diff into a single SQL script
@@ -70,6 +70,69 @@ func generateDiff(sourceParams, targetParams config.ConnectionParams, binaries c
 	}
 
 	return migrationScript.String(), nil
+}
+
+func generateDiffSupabase(sourceParams, targetParams config.ConnectionParams, binaries config.BinaryPaths) (string, error) {
+	tempDir, err := os.MkdirTemp("", "supabase_project-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	sourceUrl := formatRemoteConnectionString(sourceParams)
+	targetUrl := formatRemoteConnectionString(targetParams)
+
+	supabasePath := binaries.Supabase
+
+	cmd := exec.Command(supabasePath, "init")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to initialize supabase project: %w", err)
+	}
+
+	migrationsDir := filepath.Join(tempDir, "supabase", "migrations")
+	if err := os.MkdirAll(migrationsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create migrations directory: %w", err)
+	}
+
+	dumpFilePath := filepath.Join(migrationsDir, "0001_source_schema_dump.sql")
+	dumpFile, err := os.Create(dumpFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create dump file: %w", err)
+	}
+	defer dumpFile.Close()
+
+	cmd = exec.Command(supabasePath, "db", "dump", "--db-url", targetUrl)
+	cmd.Stdout = dumpFile
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to dump source schema: %w", err)
+	}
+
+	cmd = exec.Command(supabasePath, "start")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to start local supabase instance: %w", err)
+	}
+	defer func() {
+		stopCmd := exec.Command(supabasePath, "stop")
+		stopCmd.Dir = tempDir
+		stopCmd.Run()
+	}()
+
+	cmd = exec.Command(supabasePath, "db", "reset")
+	cmd.Dir = tempDir
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to reset local db: %w", err)
+	}
+
+	cmd = exec.Command(supabasePath, "db", "diff", "--db-url", sourceUrl)
+	cmd.Dir = tempDir
+	bytesOut, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to create diff against target db: %w", err)
+	}
+
+	return string(bytesOut), nil
 }
 
 // Clone performs a safe schema migration from a source to a target database.
@@ -94,7 +157,7 @@ func Clone(cfg *config.Config, args []string) error {
 				return fmt.Errorf("--target flag requires a value")
 			}
 		default:
-			return fmt.Errorf("unknown flag: %%s", args[i])
+			return fmt.Errorf("unknown flag: %s", args[i])
 		}
 	}
 
@@ -126,19 +189,19 @@ func Clone(cfg *config.Config, args []string) error {
 	fmt.Printf("Backing up source project '%s'...\n", sourceID)
 	sourcePrefix := fmt.Sprintf("%s_clone_backup_%s", sourceID, timestamp)
 	if err := Backup(cfg, []string{sourceID, "--prefix", sourcePrefix}); err != nil {
-		return fmt.Errorf("failed to backup source project '%s': %%w", sourceID, err)
+		return fmt.Errorf("failed to backup source project '%s': %w", sourceID, err)
 	}
 
 	fmt.Printf("Backing up target project '%s'...", targetID)
 	targetPrefix := fmt.Sprintf("%s_clone_backup_%s", targetID, timestamp)
 	if err := Backup(cfg, []string{targetID, "--prefix", targetPrefix}); err != nil {
-		return fmt.Errorf("failed to backup target project '%s': %%w", targetID, err)
+		return fmt.Errorf("failed to backup target project '%s': %w", targetID, err)
 	}
 	fmt.Println("Backups complete.")
 
 	// 4. Generate Diff
 	fmt.Println("\n--- Generating Schema Diff ---")
-	migrationScript, err := generateDiff(sourceParams, targetParams, binaries)
+	migrationScript, err := generateDiffSupabase(sourceParams, targetParams, binaries)
 	if err != nil {
 		return err
 	}
@@ -156,13 +219,13 @@ func Clone(cfg *config.Config, args []string) error {
 	// Create a temporary file to hold the script
 	tmpfile, err := os.CreateTemp("", "proman_migration_*.sql")
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file for migration script: %%w", err)
+		return fmt.Errorf("failed to create temporary file for migration script: %w", err)
 	}
 	defer tmpfile.Close()
 	defer os.Remove(tmpfile.Name()) // Clean up the file afterwards
 
 	if _, err := tmpfile.WriteString(migrationScript); err != nil {
-		return fmt.Errorf("failed to write migration script to temporary file: %%w", err)
+		return fmt.Errorf("failed to write migration script to temporary file: %w", err)
 	}
 
 	fmt.Println("Opening migration script in `less` for review (press 'q' to quit)... ")
@@ -180,15 +243,15 @@ func Clone(cfg *config.Config, args []string) error {
 	if err := lessCmd.Run(); err != nil {
 		// An error from `less` is not critical, but we should inform the user.
 		// The script can still be viewed in the temp file.
-		fmt.Fprintf(os.Stderr, "Warning: could not open script in `less`: %%v\n", err)
-		fmt.Fprintf(os.Stderr, "The script can be found at: %%s\n", tmpfile.Name())
+		fmt.Fprintf(os.Stderr, "Warning: could not open script in `less`: %v\n", err)
+		fmt.Fprintf(os.Stderr, "The script can be found at: %s\n", tmpfile.Name())
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Are you sure you want to apply this migration to project '%s'? (y/n): ", targetID)
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read user input: %%w", err)
+		return fmt.Errorf("failed to read user input: %w", err)
 	}
 
 	if strings.TrimSpace(strings.ToLower(response)) != "y" {
@@ -208,7 +271,7 @@ func Clone(cfg *config.Config, args []string) error {
 	applyCmd.Env = os.Environ()
 	applyOutput, err := applyCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to apply migration: %%s\n%%w", string(applyOutput), err)
+		return fmt.Errorf("failed to apply migration: %s\n%w", string(applyOutput), err)
 	}
 
 	fmt.Println(string(applyOutput))
