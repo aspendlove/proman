@@ -1,11 +1,11 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"proman/config"
+	"proman/utils"
 )
 
 func GenTypes(cfg *config.Config, args []string) error {
@@ -31,23 +31,26 @@ func GenTypes(cfg *config.Config, args []string) error {
 		return fmt.Errorf("path to supabase binary is not configured. Please run 'proman init'")
 	}
 
-	fmt.Fprintf(os.Stderr, "Generating TypeScript types for project: %s (%s)\n", projectID, params.SupabaseProjectID)
+	spin := utils.NewSpinner("Generating TypeScript types for project: %s", projectID)
+	spin.Start()
+	defer spin.Stop()
 
 	cmd := exec.Command(
-		supabasePath, "gen", "types", "--lang", "typescript", "--project-id", params.SupabaseProjectID, "--schema",
+		supabasePath,
+		"gen",
+		"types",
+		"--lang",
+		"typescript",
+		"--project-id",
+		params.SupabaseProjectID,
+		"--schema",
 		"public",
 	)
 
-	output, err := cmd.Output()
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
 	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			return fmt.Errorf("failed to run supabase gen types: %s", string(ee.Stderr))
-		}
 		return fmt.Errorf("failed to run supabase gen types: %w", err)
 	}
-
-	fmt.Println(string(output))
-
 	return nil
 }

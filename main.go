@@ -1,38 +1,86 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"proman/config"
 	"proman/database"
 	"proman/projects"
+	"proman/utils"
 )
 
-const helpMessage = `A CLI tool to help manage Supabase projects.
+const helpMessage = `A powerful CLI tool designed to streamline the management of Supabase projects and their databases.
 
 Usage:
-  proman <command> <subcommand> [arguments]
+  proman <command> [subcommand] [arguments]
 
-COMMANDS:
-  connection            Manage project connections.
-    register            - Register a new project connection interactively.
-    list                - List all registered projects.
-    remove [id]         - Remove a registered project.
+COMMAND GROUPS:
+  connection: Manage project connection configurations.
+    proman connection register
+        Interactively registers a new project connection by prompting for ID, host, user, etc.
 
-  db                    Perform database operations.
-    backup [id] ...     - Backup a project's database. See 'db backup --help' for flags.
-    clone ...           - Safely migrate schema. See 'db clone --help' for flags.
-    diff [src] [target] - Show the schema difference between two projects.
-    gen-types [id]      - Generate TypeScript types for a project's database.
-    gen-migration [src] [target] - Generate a migration file to make the schema of target match that of source
+    proman connection list
+        Lists all currently registered project connections in a table format.
 
-  supabase              Interact with the Supabase CLI.
-    login               - Log in to the Supabase CLI.
+    proman connection remove [project-id]
+        Removes a registered project connection by its unique ID.
 
-  init                  Configure paths to required binaries (psql, results, etc.).
-  help                  Show this help message.
+  db: Perform powerful database operations like backups, migrations, and diffs.
+    proman db backup [project-id] [flags]
+        Backs up a project's database. By default, performs a full backup (roles, schema, data).
+        Arguments:
+          [project-id]      The ID of the project to back up.
+        Flags:
+          --roles           Backup only the roles.
+          --schema          Backup only the database schema.
+          --data            Backup only the data.
+          --prefix [prefix] Set a custom prefix for the backup filenames.
+          --official        Use the official 'supabase' CLI for the backup process.
+
+    proman db exec [project-id] [filename]
+        Executes a given .sql file against a specified project's database.
+        Arguments:
+          [project-id]      The ID of the project to execute the file against.
+          [filename]        The path to the .sql file to be executed.
+
+    proman db clone --source [id] --target [id]
+        Safely migrates the schema of a target database to match a source database.
+        This is a safe operation that backs up both databases, generates a migration script,
+        prompts for user review and confirmation, and then applies the migration.
+        Flags:
+          --source [id]     The project ID to use as the desired schema source.
+          --target [id]     The project ID of the database to be migrated.
+
+    proman db diff [source-id] [target-id]
+        Generates and displays a schema diff between two projects.
+        Arguments:
+          [source-id]       The project ID to use as the source of truth.
+          [target-id]       The project ID to compare against the source.
+
+    proman db gen-migration [source-id] [target-id]
+        Generates a migration SQL script to make the target schema match the source.
+        The script is printed to standard output and is NOT automatically applied.
+        Arguments:
+          [source-id]       The project ID with the desired schema.
+          [target-id]       The project ID of the database to be migrated.
+
+    proman db gen-types [project-id]
+        Generates TypeScript types for the 'public' schema of a project's database.
+        Arguments:
+          [project-id]      The ID of the project.
+
+  supabase: Interact directly with the Supabase CLI.
+    proman supabase login
+        A convenient wrapper for the 'supabase login' command.
+
+TOP-LEVEL COMMANDS:
+  proman init
+      Interactively configures the paths for required binaries (psql, pg_dump, etc.)
+      and sets the preferred diff viewer.
+
+  proman help
+      Shows this help message.
 `
 
 func main() {
@@ -48,7 +96,7 @@ func main() {
 	}
 
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		log.Println("Configuration file not found. Creating a new one at:", configFile)
+		utils.InfoPrint("Configuration file not found, creating a new one at: %s", configFile)
 		defaultCfg, _ := config.Load(configFile)
 		if err := defaultCfg.Save(configFile); err != nil {
 			log.Fatalf("Failed to create initial config file: %v", err)
@@ -60,10 +108,9 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// --- Command Routing ---
 	args := os.Args[1:]
 	if len(args) < 1 {
-		fmt.Println(helpMessage)
+		utils.PrettyPrint(helpMessage)
 		return
 	}
 
@@ -74,7 +121,7 @@ func main() {
 	case "init":
 		err = projects.Init(cfg, configFile)
 	case "help":
-		fmt.Println(helpMessage)
+		utils.PrettyPrint(helpMessage)
 	case "connection":
 		if len(commandArgs) < 1 {
 			log.Fatal("Error: 'connection' requires a subcommand (register, list, remove).")
@@ -100,6 +147,8 @@ func main() {
 		switch subcommand {
 		case "backup":
 			err = database.Backup(cfg, subcommandArgs)
+		case "exec":
+			err = database.Exec(cfg, subcommandArgs)
 		case "clone":
 			err = database.Clone(cfg, subcommandArgs)
 		case "diff":

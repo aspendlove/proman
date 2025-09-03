@@ -5,8 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"proman/config"
+	"proman/utils"
 	"strings"
 	"time"
+
+	"github.com/briandowns/spinner"
 )
 
 func backupRoles(params config.ConnectionParams, binaries config.BinaryPaths, filename string) (string, error) {
@@ -28,14 +31,16 @@ func backupRoles(params config.ConnectionParams, binaries config.BinaryPaths, fi
 	}
 	defer outFile.Close()
 
-	fmt.Printf("Dumping roles to %s...\n", filename)
+	spin := utils.NewSpinner("Dumping roles to %s", filename)
+	spin.Start()
+	defer spin.Stop()
 
 	cmd := exec.Command(
 		binaries.PGDumpAll, "--roles-only", "--no-role-passwords", "-h", params.Host, "-p", params.Port, "-U", params.User,
 	)
 	cmd.Env = append(os.Environ(), "PGPASSWORD="+params.Password)
 	cmd.Stdout = outFile
-	cmd.Stderr = os.Stderr
+	// cmd.Stderr = os.Stderr TODO add log file
 
 	err = cmd.Run()
 
@@ -68,7 +73,9 @@ func backupSchema(params config.ConnectionParams, binaries config.BinaryPaths, f
 	}
 	defer outFile.Close()
 
-	fmt.Printf("Dumping schema to %s...\n", filename)
+	spin := utils.NewSpinner("Dumping schema to %s", filename)
+	spin.Start()
+	defer spin.Stop()
 
 	excludedSchemas := []string{
 		"auth", "cron", "extensions", "graphql", "graphql_public", "net", "pgbouncer", "pgsodium", "pgsodium_masks",
@@ -91,7 +98,7 @@ func backupSchema(params config.ConnectionParams, binaries config.BinaryPaths, f
 	cmd := exec.Command(binaries.PGDump, args...)
 	cmd.Env = append(os.Environ(), "PGPASSWORD="+params.Password)
 	cmd.Stdout = outFile
-	cmd.Stderr = os.Stderr
+	// cmd.Stderr = os.Stderr TODO add log file
 
 	err = cmd.Run()
 
@@ -124,7 +131,9 @@ func backupData(params config.ConnectionParams, binaries config.BinaryPaths, fil
 	}
 	defer outFile.Close()
 
-	fmt.Printf("Dumping data to %s...\n", filename)
+	spin := utils.NewSpinner("Dumping data to %s", filename)
+	spin.Start()
+	defer spin.Stop()
 
 	excludedSchemas := []string{
 		"auth", "cron", "extensions", "graphql", "graphql_public", "net", "pgbouncer", "pgsodium", "pgsodium_masks",
@@ -146,7 +155,7 @@ func backupData(params config.ConnectionParams, binaries config.BinaryPaths, fil
 	cmd := exec.Command(binaries.PGDump, args...)
 	cmd.Env = append(os.Environ(), "PGPASSWORD="+params.Password)
 	cmd.Stdout = outFile
-	cmd.Stderr = os.Stderr
+	// cmd.Stderr = os.Stderr TODO add log file
 
 	err = cmd.Run()
 	if err != nil {
@@ -179,20 +188,31 @@ func officialBackup(params config.ConnectionParams, binaries config.BinaryPaths,
 		filename,
 	}
 
+	var spin *spinner.Spinner = nil
+
 	switch dumpType {
 	case DATA_ONLY:
 		args = append(args, "--data-only")
+		spin = utils.NewSpinner("Dumping data to %s", filename)
+		spin.Start()
 	case ROLES_ONLY:
 		args = append(args, "--role-only")
+		spin = utils.NewSpinner("Dumping roles to %s", filename)
+		spin.Start()
+	case SCHEMA_ONLY:
+		spin = utils.NewSpinner("Dumping schema to %s", filename)
+		spin.Start()
 	}
+
+	defer spin.Stop()
 
 	cmd := exec.Command(
 		binaries.Supabase,
 		args...,
 	)
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stdout
+	// cmd.Stdout = os.Stdout TODO add log file
+	// cmd.Stderr = os.Stderr
 
 	return cmd.Run()
 }
@@ -296,6 +316,6 @@ func Backup(cfg *config.Config, args []string) error {
 		}
 	}
 
-	fmt.Println("Backup complete.")
+	utils.SuccessPrint("Backup complete\n")
 	return nil
 }

@@ -6,20 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"proman/config"
-	"strings"
+	"proman/utils"
 	"text/tabwriter"
 
 	"github.com/ugurcsen/gods-generic/sets/hashset"
 )
-
-func prompt(reader *bufio.Reader, text string) (string, error) {
-	fmt.Print(text)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(input), nil
-}
 
 func Register(cfg *config.Config, configFile string, args []string) error {
 	if len(args) != 0 {
@@ -27,9 +18,9 @@ func Register(cfg *config.Config, configFile string, args []string) error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Registering a new Supabase project connection.")
+	utils.InfoPrint("Registering a new Supabase project connection\n")
 
-	projectID, err := prompt(reader, "Enter a unique ID for this project: ")
+	projectID, err := utils.Prompt(reader, "Enter a unique ID for this project: ")
 	if err != nil {
 		return err
 	}
@@ -37,12 +28,12 @@ func Register(cfg *config.Config, configFile string, args []string) error {
 		return fmt.Errorf("project with ID '%s' already exists", projectID)
 	}
 
-	host, err := prompt(reader, "Enter Host: ")
+	host, err := utils.Prompt(reader, "Enter Host: ")
 	if err != nil {
 		return err
 	}
 
-	port, err := prompt(reader, "Enter Port (default: 5432): ")
+	port, err := utils.Prompt(reader, "Enter Port (default: 5432): ")
 	if err != nil {
 		return err
 	}
@@ -50,17 +41,17 @@ func Register(cfg *config.Config, configFile string, args []string) error {
 		port = "5432"
 	}
 
-	user, err := prompt(reader, "Enter User: ")
+	user, err := utils.Prompt(reader, "Enter User: ")
 	if err != nil {
 		return err
 	}
 
-	password, err := prompt(reader, "Enter Password: ")
+	password, err := utils.Prompt(reader, "Enter Password: ")
 	if err != nil {
 		return err
 	}
 
-	dbName, err := prompt(reader, "Enter Database Name (default: postgres): ")
+	dbName, err := utils.Prompt(reader, "Enter Database Name (default: postgres): ")
 	if err != nil {
 		return err
 	}
@@ -68,7 +59,7 @@ func Register(cfg *config.Config, configFile string, args []string) error {
 		dbName = "postgres"
 	}
 
-	supabaseProjectID, err := prompt(reader, "Enter Supabase Project ID (e.g., ref_...): ")
+	supabaseProjectID, err := utils.Prompt(reader, "Enter Supabase Project ID: ")
 	if err != nil {
 		return err
 	}
@@ -87,7 +78,7 @@ func Register(cfg *config.Config, configFile string, args []string) error {
 		return fmt.Errorf("failed to save configuration: %w", err)
 	}
 
-	fmt.Printf("\nSuccessfully registered project '%s'.\n", projectID)
+	utils.SuccessPrint("\nSuccessfully registered project %s\n", projectID)
 	return nil
 }
 
@@ -98,7 +89,7 @@ func List(cfg *config.Config, args []string) error {
 
 	connectionIDs := cfg.ListConnections()
 	if len(connectionIDs) == 0 {
-		fmt.Println("No projects are registered yet. Use 'proman register' to add one.")
+		utils.WarningPrint("No projects are registered yet. Use 'proman register' to add one")
 		return nil
 	}
 
@@ -132,7 +123,7 @@ func Remove(cfg *config.Config, configFile string, args []string) error {
 		return fmt.Errorf("failed to save configuration: %w", err)
 	}
 
-	fmt.Printf("Successfully removed project '%s'.\n", projectID)
+	utils.SuccessPrint("Successfully removed project %s\n", projectID)
 	return nil
 }
 
@@ -146,9 +137,6 @@ func Login(cfg *config.Config, args []string) error {
 		return fmt.Errorf("path to supabase binary is not configured. Please run 'proman init'")
 	}
 
-	fmt.Printf("Running `%s login`...\n", supabasePath)
-	fmt.Println("Please follow the prompts from the Supabase CLI.")
-
 	cmd := exec.Command(supabasePath, "login")
 
 	cmd.Stdout = os.Stdout
@@ -159,32 +147,31 @@ func Login(cfg *config.Config, args []string) error {
 		return fmt.Errorf("failed to run '%s login': %w", supabasePath, err)
 	}
 
-	fmt.Println("\nLogin command finished.")
 	return nil
 }
 
 func Init(cfg *config.Config, configFile string) error {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("--- Configure Binary Paths ---")
-	fmt.Println("Please provide the absolute paths for the following tools.")
-	fmt.Println("If a tool is already in your system's PATH, you can just enter its name (e.g., 'psql').")
+	utils.InfoPrint("--- Configure Binary Paths ---\n")
+	utils.InfoPrint("Please provide the absolute paths for the following tools\n")
+	utils.InfoPrint("If a tool is already in your system's PATH, you can just enter its name (ex 'psql')\n")
 
-	psqlPath, err := prompt(reader, fmt.Sprintf("Path to psql (current: %s): ", cfg.Binaries.PSQL))
+	psqlPath, err := utils.Prompt(reader, fmt.Sprintf("Path to psql (current: %s): ", cfg.Binaries.PSQL))
 	if err != nil {
 		return err
 	}
 
-	pgDumpPath, err := prompt(reader, fmt.Sprintf("Path to pg_dump (current: %s): ", cfg.Binaries.PGDump))
+	pgDumpPath, err := utils.Prompt(reader, fmt.Sprintf("Path to pg_dump (current: %s): ", cfg.Binaries.PGDump))
 	if err != nil {
 		return err
 	}
 
-	pgDumpAllPath, err := prompt(reader, fmt.Sprintf("Path to pg_dumpall (current: %s): ", cfg.Binaries.PGDumpAll))
+	pgDumpAllPath, err := utils.Prompt(reader, fmt.Sprintf("Path to pg_dumpall (current: %s): ", cfg.Binaries.PGDumpAll))
 	if err != nil {
 		return err
 	}
 
-	supabasePath, err := prompt(reader, fmt.Sprintf("Path to supabase (current: %s): ", cfg.Binaries.Supabase))
+	supabasePath, err := utils.Prompt(reader, fmt.Sprintf("Path to supabase (current: %s): ", cfg.Binaries.Supabase))
 	if err != nil {
 		return err
 	}
@@ -196,7 +183,7 @@ func Init(cfg *config.Config, configFile string) error {
 		"meld",
 	)
 
-	editor, err := prompt(reader, "Prefered Diff Viewer (zed, git, vscode, or meld): ")
+	editor, err := utils.Prompt(reader, "Prefered diff viewer (zed, git, vscode, or meld): ")
 	if err != nil {
 		return err
 	}
@@ -221,6 +208,6 @@ func Init(cfg *config.Config, configFile string) error {
 		return fmt.Errorf("failed to save configuration: %w", err)
 	}
 
-	fmt.Println("\nConfiguration saved successfully.")
+	utils.SuccessPrint("\nConfiguration saved successfully")
 	return nil
 }
