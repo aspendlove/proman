@@ -16,16 +16,9 @@ import (
 	pgschemadiff "github.com/stripe/pg-schema-diff/pkg/diff"
 )
 
-func formatRemoteConnectionString(connection config.ConnectionParams) string {
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		connection.User, connection.Password, connection.Host, connection.Port, connection.DBName,
-	)
-}
-
 func generateDiffStripe(sourceParams, targetParams config.ConnectionParams, binaries config.BinaryPaths) (string, error) {
-	sourceDSN := formatRemoteConnectionString(sourceParams)
-	targetDSN := formatRemoteConnectionString(sourceParams)
+	sourceDSN := FormatRemoteConnectionString(sourceParams)
+	targetDSN := FormatRemoteConnectionString(sourceParams)
 
 	// Open database connections
 	sourceDB, err := sql.Open("postgres", sourceDSN)
@@ -79,8 +72,8 @@ func generateDiffSupabase(sourceParams, targetParams config.ConnectionParams, bi
 	}
 	defer os.RemoveAll(tempDir)
 
-	sourceUrl := formatRemoteConnectionString(sourceParams)
-	targetUrl := formatRemoteConnectionString(targetParams)
+	sourceUrl := FormatRemoteConnectionString(sourceParams)
+	targetUrl := FormatRemoteConnectionString(targetParams)
 
 	supabasePath := binaries.Supabase
 
@@ -135,7 +128,7 @@ func generateDiffSupabase(sourceParams, targetParams config.ConnectionParams, bi
 	return string(bytesOut), nil
 }
 
-func ShowMigrations(cfg *config.Config, args []string) error {
+func GenMigration(cfg *config.Config, args []string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("diff command requires exactly two project IDs (source and target)")
 	}

@@ -26,6 +26,7 @@ COMMANDS:
     clone ...           - Safely migrate schema. See 'db clone --help' for flags.
     diff [src] [target] - Show the schema difference between two projects.
     gen-types [id]      - Generate TypeScript types for a project's database.
+    gen-migration [src] [target] - Generate a migration file to make the schema of target match that of source
 
   supabase              Interact with the Supabase CLI.
     login               - Log in to the Supabase CLI.
@@ -92,7 +93,7 @@ func main() {
 		}
 	case "db":
 		if len(commandArgs) < 1 {
-			log.Fatal("Error: 'db' requires a subcommand (backup, clone, diff, gen-types).")
+			log.Fatal("Error: 'db' requires a subcommand (backup, clone, diff, gen-types, gen-migration).")
 		}
 		subcommand := commandArgs[0]
 		subcommandArgs := commandArgs[1:]
@@ -102,9 +103,11 @@ func main() {
 		case "clone":
 			err = database.Clone(cfg, subcommandArgs)
 		case "diff":
-			err = database.ShowMigrations(cfg, subcommandArgs)
+			err = database.Diff(cfg, subcommandArgs)
 		case "gen-types":
 			err = database.GenTypes(cfg, subcommandArgs)
+		case "gen-migration":
+			err = database.GenMigration(cfg, subcommandArgs)
 		default:
 			log.Fatalf("Error: Unknown subcommand '%s' for 'db'.", subcommand)
 		}
