@@ -12,25 +12,50 @@ import (
 func backupRoles(params config.ConnectionParams, binaries config.BinaryPaths, filename string) error {
 	fmt.Printf("Dumping roles to %s...\n", filename)
 
-	dumpCmd := exec.Command(
+	var outFile *os.File = nil
+	var err error = nil
+
+	if filename == "" {
+		outFile, err = os.CreateTemp("", "tmp_schema_*.sql")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary output file: %w", err)
+		}
+		defer os.Remove(outFile.Name())
+	} else {
+		outFile, err = os.Create(filename)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+	}
+	defer outFile.Close()
+
+	cmd := exec.Command(
 		binaries.PGDumpAll, "--roles-only", "--no-role-passwords", "-h", params.Host, "-p", params.Port, "-U", params.User,
 	)
-	dumpCmd.Env = append(os.Environ(), "PGPASSWORD="+params.Password)
+	cmd.Env = append(os.Environ(), "PGPASSWORD="+params.Password)
+	cmd.Stdout = outFile
+	cmd.Stderr = os.Stderr
 
-	dumpOutput, err := dumpCmd.Output()
-	if err != nil {
-		return fmt.Errorf("pg_dumpall command failed: %w", err)
-	}
-
-	return os.WriteFile(filename, dumpOutput, 0644)
+	return cmd.Run()
 }
 
 func backupSchema(params config.ConnectionParams, binaries config.BinaryPaths, filename string) error {
 	fmt.Printf("Dumping schema to %s...\n", filename)
 
-	outFile, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+	var outFile *os.File = nil
+	var err error = nil
+
+	if filename == "" {
+		outFile, err = os.CreateTemp("", "tmp_schema_*.sql")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary output file: %w", err)
+		}
+		defer os.Remove(outFile.Name())
+	} else {
+		outFile, err = os.Create(filename)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
 	}
 	defer outFile.Close()
 
@@ -63,9 +88,20 @@ func backupSchema(params config.ConnectionParams, binaries config.BinaryPaths, f
 func backupData(params config.ConnectionParams, binaries config.BinaryPaths, filename string) error {
 	fmt.Printf("Dumping data to %s...\n", filename)
 
-	outFile, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+	var outFile *os.File = nil
+	var err error = nil
+
+	if filename == "" {
+		outFile, err = os.CreateTemp("", "tmp_schema_*.sql")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary output file: %w", err)
+		}
+		defer os.Remove(outFile.Name())
+	} else {
+		outFile, err = os.Create(filename)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
 	}
 	defer outFile.Close()
 

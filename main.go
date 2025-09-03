@@ -102,7 +102,7 @@ func main() {
 		case "clone":
 			err = database.Clone(cfg, subcommandArgs)
 		case "diff":
-			err = database.Diff(cfg, subcommandArgs)
+			err = database.ShowMigrations(cfg, subcommandArgs)
 		case "gen-types":
 			err = database.GenTypes(cfg, subcommandArgs)
 		default:
