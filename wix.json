@@ -1,0 +1,32 @@
+{
+  "product": "Proman",
+  "company": "Aidan Inc",
+  "license": "LICENSE.txt",
+  "upgrade-code": "73dbf71d-5737-4d75-bcd7-39ce908e840b",
+  "files": {
+    "guid": "445cd242-3e4c-4a26-9af1-e8889473459a",
+    "items": [
+      "proman.exe"
+    ]
+  },
+  "env": {
+    "guid": "6fffed17-f9cd-4ff8-82ed-3b2a4e81ddc0",
+    "vars": [
+      {
+        "name": "PATH",
+        "value": "[INSTALLDIR]",
+        "permanent": "no",
+        "system": "no",
+        "action": "set",
+        "part": "last"
+      }
+    ]
+  },
+  "shortcuts": {},
+  "choco": {
+    "description": "A tool to manage supabase projects",
+    "project-url": "https://github.com/aspendlove/proman",
+    "tags": "code",
+    "license-url": "https://spdx.org/licenses/GPL-3.0-only.html"
+  }
+}
