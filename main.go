@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"proman/config"
 	"proman/database"
@@ -164,14 +165,22 @@ func main() {
 		if len(commandArgs) < 1 {
 			log.Fatal("Error: 'supabase' requires a subcommand (login).")
 		}
-		subcommand := commandArgs[0]
-		subcommandArgs := commandArgs[1:]
-		switch subcommand {
-		case "login":
-			err = projects.Login(cfg, subcommandArgs)
-		default:
-			log.Fatalf("Error: Unknown subcommand '%s' for 'supabase'.", subcommand)
-		}
+		cmd := exec.Command(
+			cfg.Binaries.Supabase,
+			commandArgs...,
+		)
+
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+		// subcommand := commandArgs[0]
+		// subcommandArgs := commandArgs[1:]
+		// switch subcommand {
+		// case "login":
+		// 	err = projects.Login(cfg, subcommandArgs)
+		// default:
+		// 	log.Fatalf("Error: Unknown subcommand '%s' for 'supabase'.", subcommand)
+		// }
 	default:
 		log.Fatalf("Error: Unknown command '%s'.\n\n%s", command, helpMessage)
 	}
